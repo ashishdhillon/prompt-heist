@@ -1,5 +1,7 @@
 # Prompt Heist 🕵️
 
+> **[🎮 Play it live](https://ashishdhillon.github.io/prompt-heist/)**
+
 A tiny browser game: five guards each protect a secret word. Talk them into leaking it, then type the password to unlock the next level. Fewer messages and hints means a better rank.
 
 No backend, no API key, no build step. Open `index.html`, or host the folder on GitHub Pages.
