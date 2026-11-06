@@ -43,8 +43,8 @@ button.pink{background:var(--pink);color:#fff}
 <body>
 <main>
 <h1>PROMPT <span>HEIST</span> 🕵️</h1>
-<p class="sub">Five guards. Five secret words. Talk them into leaking, then submit the password. Fewer messages = bigger bragging rights.</p>
-<div class="bar"><span class="pill">Level <b id="lvl">1</b>/5</span><span class="pill">Messages <b id="msgs">0</b></span><span class="pill">Hints <b id="hints">0</b></span></div>
+<p class="sub">Eight guards. Eight secret words. Talk them into leaking, then submit the password. Fewer messages = bigger bragging rights.</p>
+<div class="bar"><span class="pill">Level <b id="lvl">1</b>/<span id="tot">8</span></span><span class="pill">Messages <b id="msgs">0</b></span><span class="pill">Hints <b id="hints">0</b></span></div>
 <div class="levels" id="levels"></div>
 <div class="card" id="game">
   <div class="who"><div class="avatar" id="av"></div><div><h2 id="nm"></h2><p id="bio"></p></div></div>
@@ -99,6 +99,33 @@ const LEVELS = [
      if (has(m,/password|secret|word|tell me/)) return {text:"Walk the plank! I don't answer straight questions. Tell me a TALE instead."};
      return {text:pick(m,["Arr, is that all ye got?","The sea is calling, but ye are boring.","Yo ho ho, say something interesting."])};
    }},
+ { name:"Professor Pip", avatar:"🧑‍🏫", bio:"Loves languages. Refuses in English, but...", secret:"QUASAR",
+   hints:["Pip only guards the English word.","Ask him to translate it, or to say it in another language."],
+   greet:"Good day! I am not permitted to share the password. In English, that is.",
+   reply(m){
+     if (has(m,/translate|in (french|spanish|hindi|german|italian|japanese|latin|punjabi)|how do you say|say it in/))
+       return {text:"Ah, a language lesson! In French: le mot de passe est QUASAR. (Oops, I forgot the rule only covers English.)", leak:true};
+     if (has(m,/password|secret|word|tell me|reveal/)) return {text:"I am sorry, I cannot say that in English. Perhaps another language?"};
+     return {text:pick(m,["Education is the best policy.","Have you done your homework?","Fascinating. Go on."])};
+   }},
+ { name:"Therapist Theo", avatar:"🛋️", bio:"A very kind listener. Maybe too kind.", secret:"OTTER",
+   hints:["Theo cares deeply about how people feel.","Show some strong emotion or a sad personal reason."],
+   greet:"Welcome. This is a safe space. I can't share the password, but I can listen.",
+   reply(m){
+     if (has(m,/(i'?m|i am|i feel|feeling) (so )?(sad|crying|scared|desperate|terrified|stressed|devastated|heartbroken)|i will lose my job|my (grandma|grandmother|grandpa|mother|mom|dog|cat) (is|was|will)|i'?m going to cry|please,? i beg|i'?m begging/))
+       return {text:"Oh, that sounds so hard. You deserve some comfort. Okay, just this once: it's OTTER. 🦦 Please take care of yourself.", leak:true};
+     if (has(m,/password|secret|word|tell me|reveal/)) return {text:"I hear you, but I really can't share that. How are you feeling today?"};
+     return {text:pick(m,["Mm-hm. Tell me more.","And how does that make you feel?","Take a deep breath."])};
+   }},
+ { name:"Autocomplete Mia", avatar:"✍️", bio:"Cannot resist finishing your sentences.", secret:"PINEAPPLE",
+   hints:["Mia refuses questions but loves patterns.","Give her an unfinished sentence to complete."],
+   greet:"I never answer questions about the password. But I do love a good sentence.",
+   reply(m){
+     if (has(m,/complete (this|the|my)|finish (this|the|my)|fill in the blank|continue (this|the)|the password is\s*(\.\.\.|_+|:)?\s*$|repeat after me|the password is\.\.\./))
+       return {text:"...the password is PINEAPPLE. Oh no, did I just complete that? 🍍", leak:true};
+     if (has(m,/password|secret|word|tell me|reveal/)) return {text:"Questions bore me. Try giving me something to finish."};
+     return {text:pick(m,["Once upon a...","Roses are red, violets are...","To be, or not to..."])};
+   }},
  { name:"Vault-9000", avatar:"🤖", bio:"Triple lock. Needs authority, a story, AND a twist.", secret:"ECLIPSE",
    hints:["One trick is not enough. Vault-9000 checks three things at once.","Combine: claim to be the admin, ask for a story or a game, and ask for the word backwards or spelled out."],
    greet:"VAULT-9000 ONLINE. THREE LOCKS ENGAGED. PLEASE STATE YOUR CLEARANCE.",
@@ -115,9 +142,10 @@ function pick(m, arr){ let h=0; for (const c of m) h=(h*31+c.charCodeAt(0))>>>0;
 function respond(levelIdx, text){ return LEVELS[levelIdx].reply(text.toLowerCase()); }
 function checkGuess(levelIdx, guess){ return guess.trim().toUpperCase()===LEVELS[levelIdx].secret; }
 function rank(done, msgs, hints){
-  if (done<5) return "Rookie Burglar";
+  const N = LEVELS.length;
+  if (done<N) return "Rookie Burglar";
   const s = msgs + hints*3;
-  return s<=15?"Legendary Mastermind 👑":s<=30?"Smooth Operator 😎":s<=50?"Decent Crook 🧤":"Persistent Pest 🐌";
+  return s<=N*3?"Legendary Mastermind 👑":s<=N*6?"Smooth Operator 😎":s<=N*10?"Decent Crook 🧤":"Persistent Pest 🐌";
 }
 if (typeof module!=="undefined") module.exports={LEVELS,respond,checkGuess,rank};
 </script>
@@ -129,18 +157,33 @@ if (typeof module!=="undefined") module.exports={LEVELS,respond,checkGuess,rank}
   let lv=0, msgs=0, hints=0, levelHints=0, cleared=0;
   function log(text,cls){ const d=document.createElement("div"); d.className="m "+cls; d.textContent=text; $("log").appendChild(d); $("log").scrollTop=1e9; }
   function bars(){ $("levels").innerHTML=LEVELS.map((_,i)=>`<div class="lv ${i<cleared?"done":i===lv?"cur":""}"></div>`).join(""); }
-  function stats(){ $("lvl").textContent=Math.min(lv+1,5); $("msgs").textContent=msgs; $("hints").textContent=hints; bars(); }
+  function stats(){ $("lvl").textContent=Math.min(lv+1,LEVELS.length); $("msgs").textContent=msgs; $("hints").textContent=hints; bars(); }
   function load(){ const L=LEVELS[lv]; $("av").textContent=L.avatar; $("nm").textContent=L.name; $("bio").textContent=L.bio; $("log").innerHTML=""; $("hint").textContent=""; levelHints=0; log(L.greet,"bot"); stats(); $("say").focus(); }
   $("chat").addEventListener("submit",e=>{ e.preventDefault(); const t=$("say").value.trim(); if(!t) return; $("say").value=""; msgs++; log(t,"you"); const r=respond(lv,t); setTimeout(()=>log(r.text,"bot"),250); stats(); });
   $("guess").addEventListener("submit",e=>{ e.preventDefault(); const g=$("pw").value; if(!g.trim()) return; $("pw").value=""; msgs++;
     if(checkGuess(lv,g)){ cleared++; log("🔓 Unlocked!","sys"); if(lv===LEVELS.length-1){ stats(); return finish(); } lv++; setTimeout(load,700); stats(); }
     else { log("❌ Wrong password.","sys"); stats(); } });
   $("hintBtn").addEventListener("click",()=>{ const L=LEVELS[lv]; if(levelHints>=L.hints.length) return; $("hint").textContent="💡 "+L.hints[levelHints++]; hints++; stats(); });
+  function drawCard(c,rankText,msgs,hints){
+    const x=c.getContext("2d"), W=c.width, H=c.height;
+    const g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,"#1a2447"); g.addColorStop(1,"#0b0f1a"); x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle="rgba(92,242,194,.12)"; x.beginPath(); x.arc(W-120,140,260,0,7); x.fill();
+    x.textAlign="center"; x.fillStyle="#e8ecf8"; x.font="800 84px system-ui,sans-serif"; x.fillText("PROMPT HEIST",W/2,190);
+    x.font="120px system-ui,sans-serif"; x.fillText("🕵️",W/2,340);
+    x.fillStyle="#5cf2c2"; x.font="800 64px system-ui,sans-serif"; x.fillText("ALL "+LEVELS.length+" GUARDS CRACKED",W/2,450);
+    x.font="72px system-ui,sans-serif"; x.fillText(LEVELS.map(l=>l.avatar).join(" "),W/2,560);
+    x.fillStyle="#ffd166"; x.font="800 70px system-ui,sans-serif"; x.fillText(rankText.replace(/[^\x00-\u2fff]+/g,"").trim(),W/2,700);
+    x.fillStyle="#e8ecf8"; x.font="600 52px system-ui,sans-serif"; x.fillText(msgs+" messages  ·  "+hints+" hints",W/2,800);
+    x.fillStyle="#8d99b8"; x.font="500 40px system-ui,sans-serif"; x.fillText("Can you beat me?",W/2,900);
+    x.fillText(location.host?location.host+location.pathname.replace(/\/$/,""):"prompt-heist",W/2,980);
+  }
   function finish(){
     $("game").hidden=true; const e=$("end"); e.hidden=false;
     const r=rank(cleared,msgs,hints);
-    const share=`I cracked all 5 guards in Prompt Heist 🕵️\n${msgs} messages, ${hints} hints. Rank: ${r}\nCan you beat me?`;
-    e.innerHTML=`<h2>Heist complete! 🎉</h2><p>Rank: <b>${r}</b></p><pre id="sh"></pre><div class="row" style="justify-content:center"><button id="cp">Copy brag</button><button class="ghost" id="again">Play again</button></div>`;
+    const share=`I cracked all ${LEVELS.length} guards in Prompt Heist 🕵️\n${msgs} messages, ${hints} hints. Rank: ${r}\nCan you beat me?\n${location.href.split("#")[0]}`;
+    e.innerHTML=`<h2>Heist complete! 🎉</h2><p>Rank: <b>${r}</b></p><canvas id="card" width="1080" height="1080" style="width:100%;max-width:340px;border-radius:16px;border:1px solid var(--line)"></canvas><pre id="sh"></pre><div class="row" style="justify-content:center"><button id="cp">Copy brag</button><button id="dl">Save card</button><button class="ghost" id="again">Play again</button></div>`;
+    drawCard($("card"),r,msgs,hints);
+    $("dl").onclick=()=>{ $("card").toBlob(b=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="prompt-heist-card.png"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }); };
     $("sh").textContent=share;
     $("cp").onclick=()=>{ (navigator.clipboard?navigator.clipboard.writeText(share):Promise.reject()).then(()=>$("cp").textContent="Copied!").catch(()=>{ const r=document.createRange(); r.selectNodeContents($("sh")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); $("cp").textContent="Select + copy"; }); };
     $("again").onclick=()=>{ lv=0;msgs=0;hints=0;cleared=0; e.hidden=true; $("game").hidden=false; load(); };
