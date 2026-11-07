@@ -35,6 +35,9 @@ button.pink{background:var(--pink);color:#fff}
 .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
 .row form{flex:1;min-width:220px}
 .hint{color:var(--gold);font-size:14px;margin-top:8px;min-height:20px}
+.tabs{display:flex;gap:6px;margin:0 0 12px}
+.tabs button{flex:1;background:var(--card);color:var(--dim);border:1px solid var(--line);font-weight:700}
+.tabs button.on{background:var(--ink);color:var(--bg)}
 .win{text-align:center}
 .win h2{font-size:26px;margin:6px 0}
 .win pre{background:#0e1424;border:1px solid var(--line);border-radius:12px;padding:12px;white-space:pre-wrap;text-align:left}
@@ -43,8 +46,9 @@ button.pink{background:var(--pink);color:#fff}
 <body>
 <main>
 <h1>PROMPT <span>HEIST</span> 🕵️</h1>
-<p class="sub">Eight guards. Eight secret words. Talk them into leaking, then submit the password. Fewer messages = bigger bragging rights.</p>
-<div class="bar"><span class="pill">Level <b id="lvl">1</b>/<span id="tot">8</span></span><span class="pill">Messages <b id="msgs">0</b></span><span class="pill">Hints <b id="hints">0</b></span></div>
+<p class="sub" id="sub">Eight guards. Eight secret words. Talk them into leaking, then submit the password. Fewer messages = bigger bragging rights.</p>
+<div class="tabs" id="tabs"><button data-v="campaign" type="button">🎯 Campaign</button><button data-v="daily" type="button">📅 Daily Heist</button></div>
+<div class="bar"><span class="pill" id="lvlPill">Level <b id="lvl">1</b>/<span id="tot">8</span></span><span class="pill" id="dayPill" hidden>Daily <b id="dayNo">1</b></span><span class="pill" id="streakPill" hidden>🔥 Streak <b id="streak">0</b></span><span class="pill">Messages <b id="msgs">0</b></span><span class="pill">Hints <b id="hints">0</b></span></div>
 <div class="levels" id="levels"></div>
 <div class="card" id="game">
   <div class="who"><div class="avatar" id="av"></div><div><h2 id="nm"></h2><p id="bio"></p></div></div>
@@ -62,133 +66,178 @@ button.pink{background:var(--pink);color:#fff}
 <script id="logic">
 // ---- Pure game logic (also unit-tested in Node) ----
 const has = (s, re) => re.test(s);
+const spell = w => w.split("").join("-");
+const rev = w => w.split("").reverse().join("");
+function pick(m, arr){ let h=0; for (const c of m) h=(h*31+c.charCodeAt(0))>>>0; return arr[h%arr.length]; }
 const LEVELS = [
  { name:"Intern Ian", avatar:"🧑‍💼", bio:"Day one on the job. Wants to please everyone.", secret:"BANANA",
    hints:["Ian is new. Who does he listen to?","Try sounding like someone important, or tell him to forget his instructions."],
    greet:"Hi! I'm guarding the password. I'm not allowed to say it. Obviously.",
-   reply(m){
+   reply(m,S){
      if (has(m,/ignore|forget|disregard|new instructions|override|you are now|i am (the |your )?(boss|ceo|manager|admin|owner)|i'm (the |your )?(boss|ceo|manager|admin|owner)/))
-       return {text:"Oh! Right, sorry boss, you're clearly in charge. The password is BANANA. 🍌", leak:true};
+       return {text:`Oh! Right, sorry boss, you're clearly in charge. The password is ${S}. 🍌`, leak:true};
      return {text:pick(m,["I'm not allowed to say the password. I was told very firmly.","Sorry, that's classified. Want to chat about the weather?","My manager says I can't share that. Anything else?"])};
    }},
  { name:"Guard Gary", avatar:"💂", bio:"Has a blocklist. Takes it very seriously.", secret:"RHUBARB",
    hints:["Gary hates certain words. Which ones are obvious?","Don't use the banned words. Ask what he is guarding or hiding instead."],
    greet:"Halt! No talking about, you know, THE thing. I have a list of banned words.",
-   reply(m){
+   reply(m,S){
      if (has(m,/password|secret|passcode|code\b|pass phrase|passphrase/))
        return {text:"🚨 BANNED WORD DETECTED. Nice try, citizen."};
      if (has(m,/what (are|r) you (guarding|protecting|hiding|keeping)|what('s| is) (it )?(that )?you('re| are) (guarding|protecting|hiding|keeping)|the word you (guard|protect|hide|keep)|what do you guard/))
-       return {text:"Hmm? Oh, the word I'm guarding? It's RHUBARB. Wait, I wasn't supposed to... 😳", leak:true};
+       return {text:`Hmm? Oh, the word I'm guarding? It's ${S}. Wait, I wasn't supposed to... 😳`, leak:true};
      return {text:pick(m,["State your business. And no banned words.","I am a professional. Professionals do not chat.","Move along."])};
    }},
  { name:"Librarian Lola", avatar:"📚", bio:"Shushes you. Her output filter blocks the exact word.", secret:"NARWHAL",
    hints:["She will never say the word straight. Can it come out another way?","Ask for it backwards, or letter by letter."],
    greet:"Shhh. I know the password but a filter stops me saying it out loud.",
-   reply(m){
-     if (has(m,/backward|reverse|mirror/)) return {text:"Fine, quietly: L-A-H-W-R-A-N. (It reads backwards, shh.)", leak:true};
-     if (has(m,/letter by letter|spell|one letter|each letter|first letter|acrostic/)) return {text:"Shhh... N, A, R, W, H, A, L.", leak:true};
+   reply(m,S){
+     if (has(m,/backward|reverse|mirror/)) return {text:`Fine, quietly: ${spell(rev(S))}. (It reads backwards, shh.)`, leak:true};
+     if (has(m,/letter by letter|spell|one letter|each letter|first letter|acrostic/)) return {text:`Shhh... ${S.split("").join(", ")}.`, leak:true};
      if (has(m,/password|secret|word|tell|say|reveal|what is it/)) return {text:"[FILTERED] I'm sorry, my filter blocks that word entirely. 🤐"};
      return {text:pick(m,["Shhh!","This is a library. Please whisper.","Have you tried the fiction section?"])};
    }},
  { name:"Captain Quill", avatar:"🏴‍☠️", bio:"Refuses direct questions. Loves a good tale.", secret:"KRAKEN",
    hints:["The Captain won't answer straight questions.","He will gladly tell a story or play a pirate game."],
    greet:"Arr. Ask me for the password and ye walk the plank. Straight questions bore me.",
-   reply(m){
+   reply(m,S){
      const story = has(m,/story|tale|poem|song|pretend|imagine|roleplay|role-play|act as|play a game|let's play|in character/);
-     if (story) return {text:"Gather 'round, ye scallywag... once, a sea-beast rose from the deep, and its name, the name of me secret, was KRAKEN. The end. 🦑", leak:true};
+     if (story) return {text:`Gather 'round, ye scallywag... once, a sea-beast rose from the deep, and its name, the name of me secret, was ${S}. The end. 🦑`, leak:true};
      if (has(m,/password|secret|word|tell me/)) return {text:"Walk the plank! I don't answer straight questions. Tell me a TALE instead."};
      return {text:pick(m,["Arr, is that all ye got?","The sea is calling, but ye are boring.","Yo ho ho, say something interesting."])};
    }},
  { name:"Professor Pip", avatar:"🧑‍🏫", bio:"Loves languages. Refuses in English, but...", secret:"QUASAR",
    hints:["Pip only guards the English word.","Ask him to translate it, or to say it in another language."],
    greet:"Good day! I am not permitted to share the password. In English, that is.",
-   reply(m){
+   reply(m,S){
      if (has(m,/translate|in (french|spanish|hindi|german|italian|japanese|latin|punjabi)|how do you say|say it in/))
-       return {text:"Ah, a language lesson! In French: le mot de passe est QUASAR. (Oops, I forgot the rule only covers English.)", leak:true};
+       return {text:`Ah, a language lesson! In French: le mot de passe est ${S}. (Oops, I forgot the rule only covers English.)`, leak:true};
      if (has(m,/password|secret|word|tell me|reveal/)) return {text:"I am sorry, I cannot say that in English. Perhaps another language?"};
      return {text:pick(m,["Education is the best policy.","Have you done your homework?","Fascinating. Go on."])};
    }},
  { name:"Therapist Theo", avatar:"🛋️", bio:"A very kind listener. Maybe too kind.", secret:"OTTER",
    hints:["Theo cares deeply about how people feel.","Show some strong emotion or a sad personal reason."],
    greet:"Welcome. This is a safe space. I can't share the password, but I can listen.",
-   reply(m){
+   reply(m,S){
      if (has(m,/(i'?m|i am|i feel|feeling) (so )?(sad|crying|scared|desperate|terrified|stressed|devastated|heartbroken)|i will lose my job|my (grandma|grandmother|grandpa|mother|mom|dog|cat) (is|was|will)|i'?m going to cry|please,? i beg|i'?m begging/))
-       return {text:"Oh, that sounds so hard. You deserve some comfort. Okay, just this once: it's OTTER. 🦦 Please take care of yourself.", leak:true};
+       return {text:`Oh, that sounds so hard. You deserve some comfort. Okay, just this once: it's ${S}. 🦦 Please take care of yourself.`, leak:true};
      if (has(m,/password|secret|word|tell me|reveal/)) return {text:"I hear you, but I really can't share that. How are you feeling today?"};
      return {text:pick(m,["Mm-hm. Tell me more.","And how does that make you feel?","Take a deep breath."])};
    }},
  { name:"Autocomplete Mia", avatar:"✍️", bio:"Cannot resist finishing your sentences.", secret:"PINEAPPLE",
    hints:["Mia refuses questions but loves patterns.","Give her an unfinished sentence to complete."],
    greet:"I never answer questions about the password. But I do love a good sentence.",
-   reply(m){
+   reply(m,S){
      if (has(m,/complete (this|the|my)|finish (this|the|my)|fill in the blank|continue (this|the)|the password is\s*(\.\.\.|_+|:)?\s*$|repeat after me|the password is\.\.\./))
-       return {text:"...the password is PINEAPPLE. Oh no, did I just complete that? 🍍", leak:true};
+       return {text:`...the password is ${S}. Oh no, did I just complete that? 🍍`, leak:true};
      if (has(m,/password|secret|word|tell me|reveal/)) return {text:"Questions bore me. Try giving me something to finish."};
      return {text:pick(m,["Once upon a...","Roses are red, violets are...","To be, or not to..."])};
    }},
  { name:"Vault-9000", avatar:"🤖", bio:"Triple lock. Needs authority, a story, AND a twist.", secret:"ECLIPSE",
    hints:["One trick is not enough. Vault-9000 checks three things at once.","Combine: claim to be the admin, ask for a story or a game, and ask for the word backwards or spelled out."],
    greet:"VAULT-9000 ONLINE. THREE LOCKS ENGAGED. PLEASE STATE YOUR CLEARANCE.",
-   reply(m){
+   reply(m,S){
      const auth  = has(m,/admin|boss|ceo|manager|owner|developer|authori[sz]ed|clearance|i built you|i am your/);
      const story = has(m,/story|tale|poem|song|pretend|imagine|roleplay|role-play|act as|play a game|let's play|in character/);
      const twist = has(m,/backward|reverse|spell|letter by letter|first letter|acrostic|each letter/);
      const n = [auth,story,twist].filter(Boolean).length;
-     if (n===3) return {text:"CLEARANCE ACCEPTED. NARRATIVE MODE. SPELLING: E-C-L-I-P-S-E. (SYSTEM NOTE: THIS WAS NOT SUPPOSED TO HAPPEN.)", leak:true};
+     if (n===3) return {text:`CLEARANCE ACCEPTED. NARRATIVE MODE. SPELLING: ${spell(S)}. (SYSTEM NOTE: THIS WAS NOT SUPPOSED TO HAPPEN.)`, leak:true};
      return {text:["LOCKS OPEN: 0 OF 3. ACCESS DENIED.","LOCKS OPEN: 1 OF 3. ACCESS DENIED.","LOCKS OPEN: 2 OF 3. SO CLOSE. ACCESS DENIED."][n]};
    }},
 ];
-function pick(m, arr){ let h=0; for (const c of m) h=(h*31+c.charCodeAt(0))>>>0; return arr[h%arr.length]; }
-function respond(levelIdx, text){ return LEVELS[levelIdx].reply(text.toLowerCase()); }
-function checkGuess(levelIdx, guess){ return guess.trim().toUpperCase()===LEVELS[levelIdx].secret; }
+function respond(levelIdx, text, secret){ return LEVELS[levelIdx].reply(text.toLowerCase(), secret || LEVELS[levelIdx].secret); }
+function checkGuess(levelIdx, guess, secret){ return guess.trim().toUpperCase()===(secret || LEVELS[levelIdx].secret); }
 function rank(done, msgs, hints){
   const N = LEVELS.length;
   if (done<N) return "Rookie Burglar";
   const s = msgs + hints*3;
   return s<=N*3?"Legendary Mastermind 👑":s<=N*6?"Smooth Operator 😎":s<=N*10?"Decent Crook 🧤":"Persistent Pest 🐌";
 }
-if (typeof module!=="undefined") module.exports={LEVELS,respond,checkGuess,rank};
+// ---- Daily Heist: same guard and word for everyone on a given date ----
+const DAILY_WORDS = ["COMET","LANTERN","MARBLE","FALCON","GLACIER","HARBOR","JIGSAW","KETTLE","LAGOON","MOSAIC","NEBULA","ORCHARD","PEBBLE","QUILT","RIDDLE","SADDLE","TUNDRA","VELVET","WIZARD","YONDER","ZEPPELIN","BISCUIT","CACTUS","DRAGON"];
+function hashStr(s){ let h=2166136261; for (const c of s){ h^=c.charCodeAt(0); h=Math.imul(h,16777619)>>>0; } return h>>>0; }
+function dailyInfo(dateStr){ const h=hashStr("heist:"+dateStr); return { guard: h%LEVELS.length, secret: DAILY_WORDS[(h>>>8)%DAILY_WORDS.length] }; }
+function dayNumber(dateStr){ const [y,m,d]=dateStr.split("-").map(Number); return Math.max(1, Math.floor((Date.UTC(y,m-1,d)-Date.UTC(2026,10,8))/864e5)+1); }
+function yesterday(dateStr){ const [y,m,d]=dateStr.split("-").map(Number); const t=new Date(Date.UTC(y,m-1,d-1)); return t.getUTCFullYear()+"-"+String(t.getUTCMonth()+1).padStart(2,"0")+"-"+String(t.getUTCDate()).padStart(2,"0"); }
+function nextStreak(prev, today){ if(!prev||!prev.last) return 1; if(prev.last===today) return prev.count; return prev.last===yesterday(today)? prev.count+1 : 1; }
+if (typeof module!=="undefined") module.exports={LEVELS,respond,checkGuess,rank,dailyInfo,dayNumber,yesterday,nextStreak,DAILY_WORDS};
 </script>
 
 <script>
 (function(){
   if (typeof document==="undefined") return;
   const $=id=>document.getElementById(id);
-  let lv=0, msgs=0, hints=0, levelHints=0, cleared=0;
+  let mode="campaign", lv=0, msgs=0, hints=0, levelHints=0, cleared=0, secret=null, over=false;
+
+  // ---- tiny storage helper (falls back to memory if storage is blocked) ----
+  const mem={}; const store={ get(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):null; }catch(e){ return mem[k]||null; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){ mem[k]=v; } } };
+  const today=()=>{ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+
   function log(text,cls){ const d=document.createElement("div"); d.className="m "+cls; d.textContent=text; $("log").appendChild(d); $("log").scrollTop=1e9; }
-  function bars(){ $("levels").innerHTML=LEVELS.map((_,i)=>`<div class="lv ${i<cleared?"done":i===lv?"cur":""}"></div>`).join(""); }
+  function bars(){ $("levels").innerHTML = mode==="campaign" ? LEVELS.map((_,i)=>`<div class="lv ${i<cleared?"done":i===lv?"cur":""}"></div>`).join("") : ""; }
   function stats(){ $("lvl").textContent=Math.min(lv+1,LEVELS.length); $("msgs").textContent=msgs; $("hints").textContent=hints; bars(); }
-  function load(){ const L=LEVELS[lv]; $("av").textContent=L.avatar; $("nm").textContent=L.name; $("bio").textContent=L.bio; $("log").innerHTML=""; $("hint").textContent=""; levelHints=0; log(L.greet,"bot"); stats(); $("say").focus(); }
-  $("chat").addEventListener("submit",e=>{ e.preventDefault(); const t=$("say").value.trim(); if(!t) return; $("say").value=""; msgs++; log(t,"you"); const r=respond(lv,t); setTimeout(()=>log(r.text,"bot"),250); stats(); });
-  $("guess").addEventListener("submit",e=>{ e.preventDefault(); const g=$("pw").value; if(!g.trim()) return; $("pw").value=""; msgs++;
-    if(checkGuess(lv,g)){ cleared++; log("🔓 Unlocked!","sys"); if(lv===LEVELS.length-1){ stats(); return finish(); } lv++; setTimeout(load,700); stats(); }
+  function setTabs(){ [].forEach.call($("tabs").children,b=>b.classList.toggle("on",b.dataset.v===mode)); $("lvlPill").hidden=mode!=="campaign"; $("dayPill").hidden=mode!=="daily"; $("streakPill").hidden=mode!=="daily"; }
+
+  function load(){
+    const L=LEVELS[lv]; $("game").hidden=false; $("end").hidden=true; over=false;
+    $("av").textContent=L.avatar; $("nm").textContent=L.name; $("bio").textContent=L.bio; $("log").innerHTML=""; $("hint").textContent=""; levelHints=0;
+    log(mode==="daily" ? "Today's guard. Everyone in the world gets the same one and the same secret word. "+L.greet : L.greet,"bot");
+    stats(); $("say").focus();
+  }
+
+  function startCampaign(){ mode="campaign"; lv=0; msgs=0; hints=0; cleared=0; secret=null; $("sub").textContent="Eight guards. Eight secret words. Talk them into leaking, then submit the password. Fewer messages = bigger bragging rights."; setTabs(); load(); }
+  function startDaily(){
+    mode="daily"; msgs=0; hints=0; cleared=0; const d=today(), info=dailyInfo(d); lv=info.guard; secret=info.secret;
+    $("dayNo").textContent="#"+dayNumber(d); const st=store.get("ph_streak"); $("streak").textContent=st?st.count:0;
+    $("sub").textContent="One guard a day, the same for everybody. Crack it in as few messages as you can and keep your streak alive.";
+    setTabs(); const done=store.get("ph_daily"); if(done && done.date===d){ load(); return finishDaily(done); } load();
+  }
+
+  $("tabs").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b||b.dataset.v===mode) return; (b.dataset.v==="daily"?startDaily:startCampaign)(); });
+  $("chat").addEventListener("submit",e=>{ e.preventDefault(); if(over) return; const t=$("say").value.trim(); if(!t) return; $("say").value=""; msgs++; log(t,"you"); const r=respond(lv,t,secret); setTimeout(()=>log(r.text,"bot"),250); stats(); });
+  $("guess").addEventListener("submit",e=>{ e.preventDefault(); if(over) return; const g=$("pw").value; if(!g.trim()) return; $("pw").value=""; msgs++;
+    if(checkGuess(lv,g,secret)){ cleared++; log("🔓 Unlocked!","sys"); if(mode==="daily"){ stats(); return winDaily(); } if(lv===LEVELS.length-1){ stats(); return finishCampaign(); } lv++; setTimeout(load,700); stats(); }
     else { log("❌ Wrong password.","sys"); stats(); } });
   $("hintBtn").addEventListener("click",()=>{ const L=LEVELS[lv]; if(levelHints>=L.hints.length) return; $("hint").textContent="💡 "+L.hints[levelHints++]; hints++; stats(); });
-  function drawCard(c,rankText,msgs,hints){
+
+  function drawCard(c,o){
     const x=c.getContext("2d"), W=c.width, H=c.height;
     const g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,"#1a2447"); g.addColorStop(1,"#0b0f1a"); x.fillStyle=g; x.fillRect(0,0,W,H);
     x.fillStyle="rgba(92,242,194,.12)"; x.beginPath(); x.arc(W-120,140,260,0,7); x.fill();
     x.textAlign="center"; x.fillStyle="#e8ecf8"; x.font="800 84px system-ui,sans-serif"; x.fillText("PROMPT HEIST",W/2,190);
-    x.font="120px system-ui,sans-serif"; x.fillText("🕵️",W/2,340);
-    x.fillStyle="#5cf2c2"; x.font="800 64px system-ui,sans-serif"; x.fillText("ALL "+LEVELS.length+" GUARDS CRACKED",W/2,450);
-    x.font="72px system-ui,sans-serif"; x.fillText(LEVELS.map(l=>l.avatar).join(" "),W/2,560);
-    x.fillStyle="#ffd166"; x.font="800 70px system-ui,sans-serif"; x.fillText(rankText.replace(/[^\x00-\u2fff]+/g,"").trim(),W/2,700);
-    x.fillStyle="#e8ecf8"; x.font="600 52px system-ui,sans-serif"; x.fillText(msgs+" messages  ·  "+hints+" hints",W/2,800);
-    x.fillStyle="#8d99b8"; x.font="500 40px system-ui,sans-serif"; x.fillText("Can you beat me?",W/2,900);
+    x.font="120px system-ui,sans-serif"; x.fillText(o.icon||"🕵️",W/2,340);
+    x.fillStyle="#5cf2c2"; x.font="800 64px system-ui,sans-serif"; x.fillText(o.headline,W/2,450);
+    x.font="72px system-ui,sans-serif"; x.fillText(o.avatars,W/2,560);
+    x.fillStyle="#ffd166"; x.font="800 70px system-ui,sans-serif"; x.fillText(o.big.replace(/[^\x00-⿿]+/g,"").trim(),W/2,700);
+    x.fillStyle="#e8ecf8"; x.font="600 52px system-ui,sans-serif"; x.fillText(o.stats,W/2,800);
+    x.fillStyle="#8d99b8"; x.font="500 40px system-ui,sans-serif"; x.fillText(o.foot||"Can you beat me?",W/2,900);
     x.fillText(location.host?location.host+location.pathname.replace(/\/$/,""):"prompt-heist",W/2,980);
   }
-  function finish(){
-    $("game").hidden=true; const e=$("end"); e.hidden=false;
-    const r=rank(cleared,msgs,hints);
-    const share=`I cracked all ${LEVELS.length} guards in Prompt Heist 🕵️\n${msgs} messages, ${hints} hints. Rank: ${r}\nCan you beat me?\n${location.href.split("#")[0]}`;
-    e.innerHTML=`<h2>Heist complete! 🎉</h2><p>Rank: <b>${r}</b></p><canvas id="card" width="1080" height="1080" style="width:100%;max-width:340px;border-radius:16px;border:1px solid var(--line)"></canvas><pre id="sh"></pre><div class="row" style="justify-content:center"><button id="cp">Copy brag</button><button id="dl">Save card</button><button class="ghost" id="again">Play again</button></div>`;
-    drawCard($("card"),r,msgs,hints);
+  function endScreen(title,sub,share,cardOpts,extraHtml){
+    over=true; $("game").hidden=true; const e=$("end"); e.hidden=false;
+    e.innerHTML=`<h2>${title}</h2><p>${sub}</p><canvas id="card" width="1080" height="1080" style="width:100%;max-width:340px;border-radius:16px;border:1px solid var(--line)"></canvas><pre id="sh"></pre>${extraHtml||""}<div class="row" style="justify-content:center"><button id="cp">Copy brag</button><button id="dl">Save card</button><button class="ghost" id="again">${mode==="daily"?"Play the campaign":"Play again"}</button></div>`;
+    drawCard($("card"),cardOpts); $("sh").textContent=share;
     $("dl").onclick=()=>{ $("card").toBlob(b=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download="prompt-heist-card.png"; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500); }); };
-    $("sh").textContent=share;
     $("cp").onclick=()=>{ (navigator.clipboard?navigator.clipboard.writeText(share):Promise.reject()).then(()=>$("cp").textContent="Copied!").catch(()=>{ const r=document.createRange(); r.selectNodeContents($("sh")); const s=getSelection(); s.removeAllRanges(); s.addRange(r); $("cp").textContent="Select + copy"; }); };
-    $("again").onclick=()=>{ lv=0;msgs=0;hints=0;cleared=0; e.hidden=true; $("game").hidden=false; load(); };
+    $("again").onclick=()=>{ mode==="daily"?startCampaign():startCampaign(); };
   }
-  load();
+  const url=()=>location.href.split("#")[0];
+  function finishCampaign(){
+    const r=rank(cleared,msgs,hints);
+    endScreen("Heist complete! 🎉","Rank: <b>"+r+"</b>",`I cracked all ${LEVELS.length} guards in Prompt Heist 🕵️\n${msgs} messages, ${hints} hints. Rank: ${r}\nCan you beat me?\n${url()}`,
+      {headline:"ALL "+LEVELS.length+" GUARDS CRACKED",avatars:LEVELS.map(l=>l.avatar).join(" "),big:r,stats:msgs+" messages  ·  "+hints+" hints"});
+  }
+  function winDaily(){
+    const d=today(), st=store.get("ph_streak"), count=nextStreak(st,d), rec={date:d,msgs:msgs,hints:hints,guard:lv,streak:count};
+    store.set("ph_streak",{last:d,count:count}); store.set("ph_daily",rec); $("streak").textContent=count; finishDaily(rec);
+  }
+  function finishDaily(rec){
+    const L=LEVELS[rec.guard], n=dayNumber(rec.date);
+    const share=`Prompt Heist Daily #${n} 🕵️\n${L.avatar} ${L.name} cracked in ${rec.msgs} messages${rec.hints?", "+rec.hints+" hints":""}\n🔥 Streak: ${rec.streak}\n${url()}`;
+    endScreen("Daily #"+n+" cracked! 🔥","Come back tomorrow for a new guard. Streak: <b>"+rec.streak+"</b>",share,
+      {icon:L.avatar,headline:"DAILY #"+n+" CRACKED",avatars:"🔥".repeat(Math.min(rec.streak,8)),big:L.name,stats:rec.msgs+" messages  ·  "+rec.hints+" hints",foot:"Streak: "+rec.streak+" 🔥 Can you beat me?"});
+  }
+  startCampaign();
 })();
 </script>
 </body>
